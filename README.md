@@ -94,12 +94,12 @@ At least one of `aws_access_key_id` or `aws_role_to_assume` must be provided to 
 
 | Secret | Description |
 |---|---|
-| `vault_url` | Vault server URL |
+| `vault_addr` | Vault server URL |
 | `vault_token` | Vault token (token auth method) |
 | `vault_role_id` | Vault AppRole role ID (AppRole auth method) |
 | `vault_secret_id` | Vault AppRole secret ID (AppRole auth method) |
 
-`vault_url` must be provided alongside either `vault_token` (token auth) or both `vault_role_id` and `vault_secret_id` (AppRole auth) to trigger Vault login.
+`vault_addr` must be provided alongside either `vault_token` (token auth) or both `vault_role_id` and `vault_secret_id` (AppRole auth) to trigger Vault login.
 
 ### Snowflake
 
@@ -175,7 +175,7 @@ jobs:
       aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       aws_role_to_assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
       gh_token: ${{ secrets.GH_TOKEN }}
-      vault_url: ${{ secrets.VAULT_URL }}
+      vault_addr: ${{ secrets.VAULT_ADDR }}
       vault_role_id: ${{ secrets.VAULT_ROLE_ID }}
       vault_secret_id: ${{ secrets.VAULT_SECRET_ID }}
       snowflake_account: ${{ secrets.SNOWFLAKE_ACCOUNT }}

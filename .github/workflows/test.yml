@@ -40,7 +40,8 @@ on:
         required: false
       gh_token:
         required: false
-      vault_url:
+      # HashiCorp Vault
+      vault_addr:
         required: false
       vault_token:
         required: false
@@ -132,7 +133,7 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.aws_secret_access_key }}
       AWS_ROLE_TO_ASSUME: ${{ secrets.aws_role_to_assume }}
       GITHUB_TOKEN_PROVIDER: ${{ secrets.gh_token }}
-      VAULT_URL: ${{ secrets.vault_url }}
+      VAULT_ADDR: ${{ secrets.vault_addr }}
       VAULT_TOKEN: ${{ secrets.vault_token }}
       VAULT_ROLE_ID: ${{ secrets.vault_role_id }}
       VAULT_SECRET_ID: ${{ secrets.vault_secret_id }}
@@ -168,10 +169,10 @@ jobs:
           aws-region: us-east-1
 
       - name: HashiCorp Vault Login
-        if: env.VAULT_URL != '' && (env.VAULT_TOKEN != '' || (env.VAULT_ROLE_ID != '' && env.VAULT_SECRET_ID != ''))
+        if: env.VAULT_ADDR != '' && (env.VAULT_TOKEN != '' || (env.VAULT_ROLE_ID != '' && env.VAULT_SECRET_ID != ''))
         uses: hashicorp/vault-action@v3
         with:
-          url: ${{ secrets.vault_url }}
+          url: ${{ secrets.vault_addr }}
           token: ${{ secrets.vault_token }}
           roleId: ${{ secrets.vault_role_id }}
           secretId: ${{ secrets.vault_secret_id }}
