@@ -1,0 +1,255 @@
+name: Terraform Test
+
+# Add permissions to allow writing to the repository
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    inputs:
+      test_directory:
+        required: true
+        type: string
+      terraform_vars:
+        required: false
+        type: string
+        default: ''
+        description: >
+          Optional newline-separated KEY=VALUE pairs exported as environment
+          variables before any test runs. Only TF_VAR_* keys are permitted.
+      terraform_version:
+        description: "Version of Terraform to install (e.g. 1.11.0). Defaults to latest."
+        required: false
+        type: string
+        default: "latest"
+
+    secrets:
+      azure_credentials:
+        required: false
+      terraform_token:
+        required: false
+      databricks_host:
+        required: false
+      databricks_azure_workspace_resource_id:
+        required: false
+      aws_access_key_id:
+        required: false
+      aws_secret_access_key:
+        required: false
+      aws_role_to_assume:
+        required: false
+      github_token:
+        required: false
+      vault_url:
+        required: false
+      vault_token:
+        required: false
+      vault_role_id:
+        required: false
+      vault_secret_id:
+        required: false
+      snowflake_account:
+        required: false
+      snowflake_user:
+        required: false
+      snowflake_password:
+        required: false
+      snowflake_role:
+        required: false
+      grafana_url:
+        required: false
+      grafana_auth:
+        required: false
+
+jobs:
+  find-test-files:
+    runs-on: ubuntu-latest
+    outputs:
+      validation_tests: ${{ steps.find.outputs.validation_tests }}
+      unit_tests: ${{ steps.find.outputs.unit_tests }}
+      integration_tests: ${{ steps.find.outputs.integration_tests }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Validate test_directory
+        run: |
+          resolved=$(realpath -m "$TEST_DIR")
+          repo_root=$(realpath "$GITHUB_WORKSPACE")
+          if [[ "$resolved" != "$repo_root" && "$resolved" != "$repo_root/"* ]]; then
+            echo "::error::test_directory '$TEST_DIR' resolves outside the repository root."
+            exit 1
+          fi
+          if [ ! -d "$TEST_DIR" ]; then
+            echo "::error::test_directory '$TEST_DIR' does not exist."
+            exit 1
+          fi
+        env:
+          TEST_DIR: ${{ inputs.test_directory }}
+
+      - name: Find and categorize test files
+        id: find
+        env:
+          TEST_DIR: ${{ inputs.test_directory }}
+        run: |
+          # Find all test files and categorize them
+          validation_tests=$(find "$TEST_DIR" -name "validation-*.tftest.hcl" | xargs -I{} basename {} .tftest.hcl | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          unit_tests=$(find "$TEST_DIR" -name "unit-*.tftest.hcl" | xargs -I{} basename {} .tftest.hcl | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          integration_tests=$(find "$TEST_DIR" -name "integration-*.tftest.hcl" | xargs -I{} basename {} .tftest.hcl | jq -R -s -c 'split("\n") | map(select(length > 0))')
+
+          echo "validation_tests=$validation_tests" >> $GITHUB_OUTPUT
+          echo "unit_tests=$unit_tests" >> $GITHUB_OUTPUT
+          echo "integration_tests=$integration_tests" >> $GITHUB_OUTPUT
+
+          echo "Validation tests: $validation_tests"
+          echo "Unit tests: $unit_tests" 
+          echo "Integration tests: $integration_tests"
+
+          # Check if any test files were found
+          all_validation_count=$(echo $validation_tests | jq '. | length')
+          all_unit_count=$(echo $unit_tests | jq '. | length')
+          all_integration_count=$(echo $integration_tests | jq '. | length')
+          total_test_count=$((all_validation_count + all_unit_count + all_integration_count))
+
+          if [ "$total_test_count" -eq 0 ]; then
+            echo "ERROR: No test files were found matching any pattern (validation-*.tftest.hcl, unit-*.tftest.hcl, integration-*.tftest.hcl)"
+            echo "Please ensure test files are properly named and located in the tests directory."
+            exit 1
+          else
+            echo "Found $total_test_count test files in total."
+          fi
+
+  terraform-test:
+    needs: find-test-files
+    runs-on: ubuntu-latest
+    env:
+      TF_TOKEN_app_terraform_io: ${{ secrets.terraform_token }}
+      TFE_TOKEN: ${{ secrets.terraform_token }}
+      AZURE_CREDENTIALS: ${{ secrets.azure_credentials }}
+      DATABRICKS_HOST: ${{ secrets.databricks_host }}
+      DATABRICKS_AZURE_RESOURCE_ID: ${{ secrets.databricks_azure_workspace_resource_id }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.aws_access_key_id }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.aws_secret_access_key }}
+      AWS_ROLE_TO_ASSUME: ${{ secrets.aws_role_to_assume }}
+      GITHUB_TOKEN_PROVIDER: ${{ secrets.github_token }}
+      VAULT_URL: ${{ secrets.vault_url }}
+      VAULT_TOKEN: ${{ secrets.vault_token }}
+      VAULT_ROLE_ID: ${{ secrets.vault_role_id }}
+      VAULT_SECRET_ID: ${{ secrets.vault_secret_id }}
+      SNOWFLAKE_ACCOUNT: ${{ secrets.snowflake_account }}
+      SNOWFLAKE_USER: ${{ secrets.snowflake_user }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.snowflake_password }}
+      SNOWFLAKE_ROLE: ${{ secrets.snowflake_role }}
+      GRAFANA_URL: ${{ secrets.grafana_url }}
+      GRAFANA_AUTH: ${{ secrets.grafana_auth }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ inputs.terraform_version }}
+
+      - name: Azure Login
+        if: env.AZURE_CREDENTIALS != ''
+        uses: azure/login@v3
+        with:
+          creds: ${{ secrets.azure_credentials }}
+
+      - name: AWS Login
+        if: env.AWS_ACCESS_KEY_ID != '' || env.AWS_ROLE_TO_ASSUME != ''
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.aws_access_key_id }}
+          aws-secret-access-key: ${{ secrets.aws_secret_access_key }}
+          role-to-assume: ${{ secrets.aws_role_to_assume }}
+          aws-region: us-east-1
+
+      - name: HashiCorp Vault Login
+        if: env.VAULT_URL != '' && (env.VAULT_TOKEN != '' || (env.VAULT_ROLE_ID != '' && env.VAULT_SECRET_ID != ''))
+        uses: hashicorp/vault-action@v3
+        with:
+          url: ${{ secrets.vault_url }}
+          token: ${{ secrets.vault_token }}
+          roleId: ${{ secrets.vault_role_id }}
+          secretId: ${{ secrets.vault_secret_id }}
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Set Terraform variables
+        if: inputs.terraform_vars != ''
+        env:
+          TERRAFORM_VARS: ${{ inputs.terraform_vars }}
+        run: |
+          while IFS= read -r line || [ -n "$line" ]; do
+            [ -z "$line" ] && continue
+            key="${line%%=*}"
+            if [[ "$key" != TF_VAR_* ]]; then
+              echo "::error::terraform_vars contains disallowed key '$key'. Only TF_VAR_* keys are permitted."
+              exit 1
+            fi
+            echo "$line" >> $GITHUB_ENV
+          done <<< "$TERRAFORM_VARS"
+
+      - name: Run Validation Tests
+        env:
+          TEST_DIR: ${{ inputs.test_directory }}
+        run: |
+          validation_tests=$(echo '${{ needs.find-test-files.outputs.validation_tests }}' | jq -r '.[]' | sort)
+
+          if [ -n "$validation_tests" ]; then
+            echo "======= RUNNING VALIDATION TESTS ======="
+            failed=0
+            for test_file in $validation_tests; do
+              echo "-------------------------------------------"
+              echo "Running validation test: $test_file"
+              terraform test -filter="$TEST_DIR/${test_file}.tftest.hcl" || failed=1
+              echo "-------------------------------------------"
+            done
+            exit $failed
+          else
+            echo "No validation tests found"
+          fi
+
+      - name: Run Unit Tests
+        env:
+          TEST_DIR: ${{ inputs.test_directory }}
+        run: |
+          unit_tests=$(echo '${{ needs.find-test-files.outputs.unit_tests }}' | jq -r '.[]' | sort)
+
+          if [ -n "$unit_tests" ]; then
+            echo "======= RUNNING UNIT TESTS ======="
+            failed=0
+            for test_file in $unit_tests; do
+              echo "-------------------------------------------"
+              echo "Running unit test: $test_file"
+              terraform test -filter="$TEST_DIR/${test_file}.tftest.hcl" || failed=1
+              echo "-------------------------------------------"
+            done
+            exit $failed
+          else
+            echo "No unit tests found"
+          fi
+
+      - name: Run Integration Tests
+        env:
+          TEST_DIR: ${{ inputs.test_directory }}
+        run: |
+          integration_tests=$(echo '${{ needs.find-test-files.outputs.integration_tests }}' | jq -r '.[]' | sort)
+
+          if [ -n "$integration_tests" ]; then
+            echo "======= RUNNING INTEGRATION TESTS ======="
+            failed=0
+            for test_file in $integration_tests; do
+              echo "-------------------------------------------"
+              echo "Running integration test: $test_file"
+              terraform test -filter="$TEST_DIR/${test_file}.tftest.hcl" || failed=1
+              echo "-------------------------------------------"
+            done
+            exit $failed
+          else
+            echo "No integration tests found"
+          fi
