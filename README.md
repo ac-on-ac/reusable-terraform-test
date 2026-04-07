@@ -88,7 +88,7 @@ At least one of `aws_access_key_id` or `aws_role_to_assume` must be provided to 
 
 | Secret | Description |
 |---|---|
-| `github_token` | GitHub personal access token or app token for the Terraform GitHub provider. Exposed as `GITHUB_TOKEN_PROVIDER` to avoid conflicting with the built-in `GITHUB_TOKEN`. |
+| `gh_token` | GitHub personal access token or app token for the Terraform GitHub provider. Exposed as `GITHUB_TOKEN_PROVIDER` to avoid conflicting with the built-in `GITHUB_TOKEN`. |
 
 ### HashiCorp Vault
 
@@ -174,7 +174,7 @@ jobs:
       aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
       aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       aws_role_to_assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
-      github_token: ${{ secrets.GH_TOKEN }}
+      gh_token: ${{ secrets.GH_TOKEN }}
       vault_url: ${{ secrets.VAULT_URL }}
       vault_role_id: ${{ secrets.VAULT_ROLE_ID }}
       vault_secret_id: ${{ secrets.VAULT_SECRET_ID }}

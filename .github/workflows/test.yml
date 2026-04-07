@@ -38,7 +38,7 @@ on:
         required: false
       aws_role_to_assume:
         required: false
-      github_token:
+      gh_token:
         required: false
       vault_url:
         required: false
@@ -131,7 +131,7 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.aws_access_key_id }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.aws_secret_access_key }}
       AWS_ROLE_TO_ASSUME: ${{ secrets.aws_role_to_assume }}
-      GITHUB_TOKEN_PROVIDER: ${{ secrets.github_token }}
+      GITHUB_TOKEN_PROVIDER: ${{ secrets.gh_token }}
       VAULT_URL: ${{ secrets.vault_url }}
       VAULT_TOKEN: ${{ secrets.vault_token }}
       VAULT_ROLE_ID: ${{ secrets.vault_role_id }}
